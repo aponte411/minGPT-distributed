@@ -1,0 +1,11 @@
+gpt_config:
+  n_layer: 8
+  n_head: 8
+  n_embd: 512
+optimizer_config:
+  weight_decay: 0.1
+  learning_rate: 0.0003
+
+hydra:
+  run:
+    dir: ./
