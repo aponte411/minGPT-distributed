@@ -1,12 +1,14 @@
 import torch
 from torch.utils.data import Dataset
-
 """
 Adapted from https://github.com/karpathy/minGPT/blob/master/projects/chargpt/chargpt.py
 """
+
+
 class CharDataset(Dataset):
+
     def __init__(self, path: str, block_size: int):
-        with open(path,"r") as f:
+        with open(path, "r") as f:
             data = f.read()
 
         chars = sorted(list(set(data)))
@@ -22,11 +24,11 @@ class CharDataset(Dataset):
 
     def __getitem__(self, idx):
         # We want to grab chars in blocks
-        block = self.data[idx:idx+self.block_size+1]
+        block = self.data[idx:idx + self.block_size + 1]
         # Encode to chars to integers
         indices = [self.stoi[char] for char in block]
         # Grab everything but last char in block
-        inputs = torch.tensor(indices[:-1],dtype=torch.long)
+        inputs = torch.tensor(indices[:-1], dtype=torch.long)
         # Grab everything but first char in block
-        labels = torch.tensor(indices[1:],dtype=torch.long)
+        labels = torch.tensor(indices[1:], dtype=torch.long)
         return inputs, labels

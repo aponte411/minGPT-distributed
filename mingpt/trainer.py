@@ -35,7 +35,13 @@ class ModelSnapshot:
 
 
 class GPTTrainer:
-    def __init__(self, config: GPTTrainerConfig, model: torch.nn.Module, optimizer: Any, train_dataset: Dataset, test_dataset: Dataset=None):
+
+    def __init__(self,
+                 config: GPTTrainerConfig,
+                 model: torch.nn.Module,
+                 optimizer: Any,
+                 train_dataset: Dataset,
+                 test_dataset: Dataset = None):
         # Torchrun settings
         self.local_rank = int(os.environ["LOCAL_RANK"])
         self.global_rank = int(os.environ["RANK"])
@@ -44,7 +50,8 @@ class GPTTrainer:
 
         # setup the dataloader
         self.train_loader = self._get_dataloader(train_dataset)
-        self.test_loader = self._get_dataloader(test_dataset) if test_dataset else None
+        self.test_loader = self._get_dataloader(
+            test_dataset) if test_dataset else None
 
         self.model = model.to(self.local_rank)
         self.optimizer = optimizer
@@ -64,10 +71,10 @@ class GPTTrainer:
             sampler=DistributedSampler(dataset),
         )
 
-    def _load_snapshot(self,path: str):
+    def _load_snapshot(self, path: str):
         if os.path.exists(path):
             # If the model snapshot is already there, load it onto the cpu
-            snapshot_data = torch.load(path,map_location="cpu")
+            snapshot_data = torch.load(path, map_location="cpu")
             # Load into ModelSnapshot object
             model_snapshot = ModelSnapshot(**snapshot_data)
             # Load model states into model which is on GPU
@@ -90,27 +97,31 @@ class GPTTrainer:
             # Backward pass to compute gradients
             loss.backward()
             # Clip gradients
-            torch.nn.utils.clip_grad_norm(
-                self.model.parameters(),
-                self.config.grap_norm_clip
-            )
+            torch.nn.utils.clip_grad_norm(self.model.parameters(),
+                                          self.config.grap_norm_clip)
             # Update parameters
             self.optimizer.step()
         return loss.item()
 
-    def _run_epoch(self, epoch: int, dataloader: DataLoader, train: bool = True) -> None:
+    def _run_epoch(self,
+                   epoch: int,
+                   dataloader: DataLoader,
+                   train: bool = True) -> None:
         """Run epoch for batch of data"""
         for idx, (x, y) in enumerate(dataloader):
             inputs = x.to(self.local_rank)
             labels = y.to(self.local_rank)
             loss = self._run_batch(inputs, labels, train)
             if idx % 100 == 0:
-                print(f"[GPU{self.local_rank}] Epoch {epoch+1},{'Training' if train else 'Test'} loss {loss}")
+                print(
+                    f"[GPU{self.local_rank}] Epoch {epoch+1},{'Training' if train else 'Test'} loss {loss}"
+                )
 
     def _snapshot_model(self, epoch: int) -> None:
         """Checkpoint the model state and optimizer state for a given
         epoch. """
-        model = self.model.module if hasattr(self.model,"module") else self.model
+        model = self.model.module if hasattr(self.model,
+                                             "module") else self.model
         model_snapshot = ModelSnapshot(
             model_state=model.state_dict(),
             optimizer_state=self.optimizer.state_dict(),
@@ -118,8 +129,10 @@ class GPTTrainer:
         )
         # Save snapshot as dictionary (it pickles underneath)
         model_snapshot_file = "model_snapshot.pt"
-        torch.save(asdict(model_snapshot),model_snapshot_file)
-        print(f"Model snapshot taken and saved at epoch {epoch}, filename: {model_snapshot_file}")
+        torch.save(asdict(model_snapshot), model_snapshot_file)
+        print(
+            f"Model snapshot taken and saved at epoch {epoch}, filename: {model_snapshot_file}"
+        )
 
     def train(self, max_epochs: int) -> None:
         """Train model for max_epochs. We also snapshot
@@ -136,11 +149,3 @@ class GPTTrainer:
                 # Set train to false so we run in evaluation mode and
                 # do not compute gradients
                 self._run_epoch(epoch, self.test_dataset, False)
-
-
-
-
-
-
-
-

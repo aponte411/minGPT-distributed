@@ -17,6 +17,7 @@ import torch
 
 # -----------------------------------------------------------------------------
 
+
 def bytes_to_unicode():
     """
     Every possible byte (really an integer 0..255) gets mapped by OpenAI to a unicode
@@ -33,8 +34,12 @@ def bytes_to_unicode():
     like 'Ā', or 'Ġ', etc.
     """
     # the 188 integers that render fine in their original form and need no shifting
-    bs = list(range(ord("!"), ord("~")+1))+list(range(ord("¡"), ord("¬")+1))+list(range(ord("®"), ord("ÿ")+1))
-    cs = bs[:] # all integers b in bs will simply map to chr(b) in the output dict
+    bs = list(range(ord("!"),
+                    ord("~") + 1)) + list(range(
+                        ord("¡"),
+                        ord("¬") + 1)) + list(range(ord("®"),
+                                                    ord("ÿ") + 1))
+    cs = bs[:]  # all integers b in bs will simply map to chr(b) in the output dict
     # now get the representations of the other 68 integers that do need shifting
     # each will get mapped chr(256 + n), where n will grow from 0...67 in the loop
     n = 0
@@ -42,11 +47,12 @@ def bytes_to_unicode():
         if b not in bs:
             # if this byte is "ugly" then map it to the next available "nice" character
             bs.append(b)
-            cs.append(2**8+n)
+            cs.append(2**8 + n)
             n += 1
     cs = [chr(n) for n in cs]
     d = dict(zip(bs, cs))
     return d
+
 
 def get_pairs(word):
     """
@@ -59,15 +65,16 @@ def get_pairs(word):
         prev_char = char
     return pairs
 
+
 class Encoder:
 
     def __init__(self, encoder, bpe_merges):
         # byte encoder/decoder
         self.byte_encoder = bytes_to_unicode()
-        self.byte_decoder = {v:k for k, v in self.byte_encoder.items()}
+        self.byte_decoder = {v: k for k, v in self.byte_encoder.items()}
         # bpe token encoder/decoder
         self.encoder = encoder
-        self.decoder = {v:k for k,v in self.encoder.items()}
+        self.decoder = {v: k for k, v in self.encoder.items()}
         # bpe merge list that defines the bpe "tree", of tuples (a,b) that are to merge to token ab
         self.bpe_ranks = dict(zip(bpe_merges, range(len(bpe_merges))))
         # the splitting pattern used for pre-tokenization
@@ -89,7 +96,9 @@ class Encoder:
         - we are special casing a few common apostrophe constructs ('s, 't, 're, ...) and making those into separate tokens
         - we then separate out strings into consecutive chunks of 1) letters, 2) numbers, 3) non-letter-numbers, 4) whitespaces
         """
-        self.pat = re.compile(r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+""")
+        self.pat = re.compile(
+            r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
+        )
         self.cache = {}
 
     def bpe(self, token):
@@ -104,8 +113,9 @@ class Encoder:
         if token in self.cache:
             return self.cache[token]
 
-        word = tuple(token) # individual characters that make up the token, in a tuple
-        pairs = get_pairs(word) # get all bigrams
+        word = tuple(
+            token)  # individual characters that make up the token, in a tuple
+        pairs = get_pairs(word)  # get all bigrams
 
         if not pairs:
             return token
@@ -113,9 +123,10 @@ class Encoder:
         while True:
 
             # find the next lowest rank bigram that can be merged
-            bigram = min(pairs, key = lambda pair: self.bpe_ranks.get(pair, float('inf')))
+            bigram = min(
+                pairs, key=lambda pair: self.bpe_ranks.get(pair, float('inf')))
             if bigram not in self.bpe_ranks:
-                break # no more bigrams are eligible to be merged
+                break  # no more bigrams are eligible to be merged
             first, second = bigram
 
             # we will now replace all occurences of (first, second) in the list of current
@@ -134,8 +145,9 @@ class Encoder:
                     break
 
                 # if this occurence is also followed by second, then merge them into one
-                if word[i] == first and i < len(word)-1 and word[i+1] == second:
-                    new_word.append(first+second)
+                if word[i] == first and i < len(word) - 1 and word[
+                        i + 1] == second:
+                    new_word.append(first + second)
                     i += 2
                 else:
                     new_word.append(word[i])
@@ -168,7 +180,8 @@ class Encoder:
             # encode the token as a bytes (b'') object
             token_bytes = token.encode('utf-8')
             # translate all bytes to their unicode string representation and flatten
-            token_translated = ''.join(self.byte_encoder[b] for b in token_bytes)
+            token_translated = ''.join(self.byte_encoder[b]
+                                       for b in token_bytes)
             # perform all the applicable bpe merges according to self.bpe_ranks
             token_merged = self.bpe(token_translated).split(' ')
             # translate all bpe tokens to integers
@@ -184,7 +197,8 @@ class Encoder:
         tokens = re.findall(self.pat, text)
         for token in tokens:
             token_bytes = token.encode('utf-8')
-            token_translated = ''.join(self.byte_encoder[b] for b in token_bytes)
+            token_translated = ''.join(self.byte_encoder[b]
+                                       for b in token_bytes)
             token_merged = self.bpe(token_translated).split(' ')
             token_ix = [self.encoder[bpe_token] for bpe_token in token_merged]
             bpe_idx.extend(token_ix)
@@ -196,9 +210,9 @@ class Encoder:
                 'token_ix': token_ix,
             })
         out = {
-            'bpe_idx': bpe_idx, # the actual output sequence
-            'tokens': tokens, # result of pre-tokenization
-            'parts': parts, # intermediates for each token part
+            'bpe_idx': bpe_idx,  # the actual output sequence
+            'tokens': tokens,  # result of pre-tokenization
+            'parts': parts,  # intermediates for each token part
         }
         return out
 
@@ -213,12 +227,14 @@ class Encoder:
         text = tokens_bytes.decode('utf-8', errors='replace')
         return text
 
+
 def get_file(local_file, remote_file):
     """ downloads remote_file to local_file if necessary """
     if not os.path.isfile(local_file):
         print(f"downloading {remote_file} to {local_file}")
         response = requests.get(remote_file)
         open(local_file, "wb").write(response.content)
+
 
 def get_encoder():
     """
@@ -235,7 +251,9 @@ def get_encoder():
     get_file(encoder_local_file, encoder_remote_file)
     with open(encoder_local_file, 'r') as f:
         encoder = json.load(f)
-    assert len(encoder) == 50257 # 256 individual byte tokens, 50,000 merged tokens, and 1 special <|endoftext|> token
+    assert len(
+        encoder
+    ) == 50257  # 256 individual byte tokens, 50,000 merged tokens, and 1 special <|endoftext|> token
 
     # load vocab.bpe that contains the bpe merges, i.e. the bpe tree structure
     # in the form tuples (a, b), that indicate that (a, b) is to be merged to one token ab
@@ -245,14 +263,18 @@ def get_encoder():
     with open(vocab_local_file, 'r', encoding="utf-8") as f:
         bpe_data = f.read()
     # light postprocessing: strip the version on first line and the last line is a blank
-    bpe_merges = [tuple(merge_str.split()) for merge_str in bpe_data.split('\n')[1:-1]]
-    assert len(bpe_merges) == 50000 # 50,000 merged tokens
+    bpe_merges = [
+        tuple(merge_str.split()) for merge_str in bpe_data.split('\n')[1:-1]
+    ]
+    assert len(bpe_merges) == 50000  # 50,000 merged tokens
 
     # construct the Encoder object and return
     enc = Encoder(encoder, bpe_merges)
     return enc
 
+
 # -----------------------------------------------------------------------------
+
 
 class BPETokenizer:
     """ PyTorch-aware class that wraps the Encoder above """
@@ -288,7 +310,9 @@ if __name__ == '__main__':
 
     print("Original text is:")
     print(text)
-    print("First the text gets pre-tokenized, broken up into chunks, the outcome is:")
+    print(
+        "First the text gets pre-tokenized, broken up into chunks, the outcome is:"
+    )
     print(r['tokens'])
     # ['Hello', '!!', ' I', "'m", ' Andrej', ' Karpathy', '.', ' It', "'s", ' 2022', '.', ' w', '00', 't', ' :', 'D', ' 🤗']
     print("Then we iterate over each chunk and process them in turn...")
@@ -312,7 +336,9 @@ if __name__ == '__main__':
     # {'token': 'D', 'token_bytes': b'D', 'token_translated': 'D', 'token_merged': ['D'], 'token_ix': [35]}
     # {'token': ' 🤗', 'token_bytes': b' \xf0\x9f\xa4\x97', 'token_translated': 'ĠðŁ¤Ĺ', 'token_merged': ['ĠðŁ', '¤', 'Ĺ'], 'token_ix': [12520, 97, 245]}
     # (refer to the code inside Encoder.encode for what these intermediates are)
-    print("and the final outcome is concatenating and flattening all the token_ix:")
+    print(
+        "and the final outcome is concatenating and flattening all the token_ix:"
+    )
     print(r['bpe_idx'])
     # [15496, 3228, 314, 1101, 10948, 73, 509, 5117, 10036, 13, 632, 338, 33160, 13, 266, 405, 83, 1058, 35, 12520, 97, 245]
     # this would then become the integer input sequence to the transformer

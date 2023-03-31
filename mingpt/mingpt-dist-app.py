@@ -7,14 +7,16 @@ from trainer import GPTTrainer, GPTTrainerConfig
 from model import GPT, GPTConfig, OptimizerConfig, create_optimizer
 from char_dataset import CharDataset
 
+
 def get_resources(
     gpt_config: GPTConfig,
     optimizer_config: OptimizerConfig,
     data_config: DictConfig,
 ):
     data = CharDataset(data_config.path, data_config.block_size)
-    train_size = int(len(data)*data_config.train_split)
-    train_split, test_split = random_split(data,[train_size, len(data) - train_size])
+    train_size = int(len(data) * data_config.train_split)
+    train_split, test_split = random_split(
+        data, [train_size, len(data) - train_size])
     gpt_config.vocab_size = data.vocab_size
     gpt_config.block_size = data.block_size
     model = GPT(gpt_config)
@@ -23,7 +25,7 @@ def get_resources(
 
 
 @hydra.main(version_base=None, config_path=".", config_name="gpt2_config")
-def mingpt_dist_app(cfg : DictConfig) -> None:
+def mingpt_dist_app(cfg: DictConfig) -> None:
     """Entry point for distributed training GPT"""
     # Setup distributed training process group
     init_process_group(backend="nccl")
@@ -51,6 +53,7 @@ def mingpt_dist_app(cfg : DictConfig) -> None:
     trainer.train(trainer_config.max_epochs)
     # Cleanup
     destroy_process_group()
+
 
 if __name__ == "__main__":
     mingpt_dist_app()
