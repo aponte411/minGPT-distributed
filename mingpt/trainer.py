@@ -15,7 +15,7 @@ from torch.utils.data.distributed import DistributedSampler
 
 
 @dataclass
-class TrainerConfig:
+class GPTTrainerConfig:
     job_name: str
     dl_num_workers: int = 4
     max_epochs: int = None
@@ -34,8 +34,8 @@ class ModelSnapshot:
     final_epoch: int
 
 
-class Trainer:
-    def __init__(self, config: TrainerConfig, model, optimizer, train_dataset, test_dataset=None):
+class GPTTrainer:
+    def __init__(self, config: GPTTrainerConfig, model: torch.nn.Module, optimizer: Any, train_dataset: Dataset, test_dataset: Dataset=None):
         # Torchrun settings
         self.local_rank = int(os.environ["LOCAL_RANK"])
         self.global_rank = int(os.environ["RANK"])
