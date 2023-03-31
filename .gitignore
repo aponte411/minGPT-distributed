@@ -4,3 +4,5 @@ __pycache__/
 .env
 .pylintrc
 minGPT_distributed.egg-info/*
+mingpt/slurm/cluster-config-hpc6a.yml
+*.pem
