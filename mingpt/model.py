@@ -82,9 +82,14 @@ def create_optimizer(model: torch.nn.Module,
                     m, whitelist_weight_modules):
                 # weights of whitelist modules will be weight decayed
                 decay.add(fpn)
+            elif pn.endswith("in_proj_weight"):
+                # Adding the MHA projection
+                decay.add(fpn)
             elif pn.endswith('weight') and isinstance(
                     m, blacklist_weight_modules):
                 # weights of blacklist modules will NOT be weight decayed
+                no_decay.add(fpn)
+            elif pn.endswith("pos_embedding"):
                 no_decay.add(fpn)
 
     # validate that we considered every parameter
@@ -128,7 +133,7 @@ class MultiHeadSelfAttention(nn.Module):
                  dtype: Union[torch.FloatTensor,
                               torch.HalfTensor] = torch.float32):
         super().__init__()
-        assert config.n_embd % config.n_head == 0
+        assert config.n_embed % config.n_head == 0
         # output projection
         self.c_proj = nn.Linear(config.n_embed, config.n_embed)
         # regularization
@@ -180,7 +185,7 @@ class Block(nn.Module):
 
     def forward(self, x):
         x = x + self.attn(self.ln_1(x))
-        x = x + self.mlpf(self.ln_2(x))
+        x = x + self.mlp(self.ln_2(x))
         return x
 
 

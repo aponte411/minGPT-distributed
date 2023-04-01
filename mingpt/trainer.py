@@ -4,7 +4,7 @@ so nothing in this file really has anything to do with GPT specifically.
 """
 
 from dataclasses import dataclass, asdict
-from typing import Tuple, Optional, Dict, Any
+from typing import Optional, Dict, Any
 from collections import OrderedDict
 import os
 
@@ -20,14 +20,13 @@ from torch.utils.data.distributed import DistributedSampler
 
 @dataclass
 class GPTTrainerConfig:
-    job_name: str
-    dl_num_workers: int = 4
     max_epochs: int = None
-    batch_size: int = 64
-    learning_rate: float = 3e-4
-    betas: Tuple[float] = (0.9, 0.95)
+    batch_size: int = None
+    learning_rate: float = None
     grad_norm_clip: float = 0.1
+    dl_num_workers: int = 4
     snapshot_path: Optional[str] = None
+    save_every: int = None
 
 
 # Class to hold model state + optimizer state
@@ -54,15 +53,15 @@ class GPTTrainer:
         self.global_rank = int(os.environ["RANK"])
         self.config = config
         self.train_dataset = train_dataset
-
-        # setup the dataloader
+        # Setup the dataloader
         self.train_loader = self._get_dataloader(train_dataset)
         self.test_loader = self._get_dataloader(
             test_dataset) if test_dataset else None
-
+        # Initialize model
         self.model = model.to(self.local_rank)
         self.optimizer = optimizer
         self.save_every = config.save_every
+        self.last_epoch = 0
         # Load model snapshot if available
         if self.config.snapshot_path is None:
             self.config.snapshot_path = "gpt_snapshot.pt"
@@ -165,12 +164,12 @@ class GPTTrainer:
             f"Model snapshot taken and saved at epoch {epoch}"
         )
 
-    def train(self, max_epochs: int) -> None:
+    def train(self) -> None:
         """Train model for max_epochs. We also snapshot
         the model and optimizer states every 'self.save_every' epochs"""
         # Tricky: Make sure you train starting at the last snapshot epoch, or else you will start
         # from scratch everytime.
-        for epoch in range(self.last_epoch, self.max_epochs):
+        for epoch in range(self.last_epoch, self.config.max_epochs):
             self._run_epoch(epoch, self.train_loader, True)
             # We only snapshot the model at the head node
             if self.local_rank == 0 and epoch % self.save_every == 0:

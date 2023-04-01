@@ -50,7 +50,7 @@ def mingpt_dist_app(cfg: DictConfig) -> None:
         test,
     )
     # Train model for max epochs
-    trainer.train(trainer_config.max_epochs)
+    trainer.train()
     # Cleanup
     destroy_process_group()
 
