@@ -13,6 +13,9 @@ def get_resources(
     optimizer_config: OptimizerConfig,
     data_config: DataConfig,
 ):
+    """
+    Prepare resources for training
+    """
     data = CharDataset(data_config.path, data_config.block_size)
     train_size = int(len(data) * data_config.train_split)
     train_split, test_split = random_split(
