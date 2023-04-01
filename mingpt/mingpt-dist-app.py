@@ -5,13 +5,13 @@ from torch.utils.data import random_split
 
 from trainer import GPTTrainer, GPTTrainerConfig
 from model import GPT, GPTConfig, OptimizerConfig, create_optimizer
-from char_dataset import CharDataset
+from char_dataset import CharDataset, DataConfig
 
 
 def get_resources(
     gpt_config: GPTConfig,
     optimizer_config: OptimizerConfig,
-    data_config: DictConfig,
+    data_config: DataConfig,
 ):
     data = CharDataset(data_config.path, data_config.block_size)
     train_size = int(len(data) * data_config.train_split)
@@ -32,7 +32,7 @@ def mingpt_dist_app(cfg: DictConfig) -> None:
     # Setup configuration
     gpt_config = GPTConfig(**cfg["gpt_config"])
     optimizer_config = OptimizerConfig(**cfg["optimizer_config"])
-    data_config = cfg["data_config"]
+    data_config = DataConfig(**cfg["data_config"])
     trainer_config = GPTTrainerConfig(**cfg["trainer_config"])
 
     # Get resources and pass in configuration parameters

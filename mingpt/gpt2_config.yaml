@@ -5,6 +5,18 @@ gpt_config:
 optimizer_config:
   weight_decay: 0.1
   learning_rate: 0.0003
+data_config:
+  path: s3://bucket
+  block_size: 128
+  truncate: 0.05
+trainer_config:
+  max_epochs: 10
+  batch_size: 64
+  dl_num_workers: 4
+  grad_norm_clip: 1.0
+  snapshot_path: s3://bucket/gpt_snapshot.pt
+  save_every: 3
+
 
 hydra:
   run:

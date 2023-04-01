@@ -1,15 +1,29 @@
+from dataclasses import dataclass
+from typing import Optional
+
+import fsspec
 import torch
 from torch.utils.data import Dataset
+
 """
 Adapted from https://github.com/karpathy/minGPT/blob/master/projects/chargpt/chargpt.py
 """
 
+@dataclass
+class DataConfig:
+    path: Optional[str] = None
+    block_size: Optional[int] = None
+    train_split: Optional[float] = None
+    truncate: float = 1.0
+
+
 
 class CharDataset(Dataset):
 
-    def __init__(self, path: str, block_size: int):
-        with open(path, "r") as f:
+    def __init__(self, config: DataConfig, block_size: int):
+        with fsspec.open(config.path) as f:
             data = f.read()
+        data = data[:int(len(data)*config.truncate)]
 
         chars = sorted(list(set(data)))
         print(f"Data has {len(data)} chars and {len(chars)} unique characters")

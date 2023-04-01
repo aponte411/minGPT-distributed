@@ -9,6 +9,10 @@ from collections import OrderedDict
 import os
 
 import torch
+import fsspec
+from urllib.parse import urlparse
+import io
+import boto3
 from torch.utils.data.dataloader import DataLoader, Dataset
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data.distributed import DistributedSampler
@@ -26,7 +30,7 @@ class GPTTrainerConfig:
     snapshot_path: Optional[str] = None
 
 
-# class to hold model state
+# Class to hold model state + optimizer state
 @dataclass
 class ModelSnapshot:
     model_state: "OrderedDict[str, torch.Tensor]"
@@ -35,7 +39,10 @@ class ModelSnapshot:
 
 
 class GPTTrainer:
-
+    """
+    Trainer object to abstract away
+    training details and interaction with s3.
+    """
     def __init__(self,
                  config: GPTTrainerConfig,
                  model: torch.nn.Module,
@@ -57,7 +64,9 @@ class GPTTrainer:
         self.optimizer = optimizer
         self.save_every = config.save_every
         # Load model snapshot if available
-        self._load_snapshot(config.snapshot_path)
+        if self.config.snapshot_path is None:
+            self.config.snapshot_path = "gpt_snapshot.pt"
+        self._load_snapshot()
         # Wrap model in DistributedDataParallel
         self.model = DDP(self.model, device_ids=[self.local_rank])
 
@@ -71,27 +80,44 @@ class GPTTrainer:
             sampler=DistributedSampler(dataset),
         )
 
-    def _load_snapshot(self, path: str):
-        if os.path.exists(path):
-            # If the model snapshot is already there, load it onto the cpu
-            snapshot_data = torch.load(path, map_location="cpu")
-            # Load into ModelSnapshot object
-            model_snapshot = ModelSnapshot(**snapshot_data)
-            # Load model states into model which is on GPU
-            self.model.load_state_dict(model_snapshot.model_state)
-            # Load optimizer states on GPU
-            self.optimizer.load_state_dict(model_snapshot.optimizer_state)
-            # Last epoch
-            self.last_epoch = model_snapshot.final_epoch
-            print(f"Resuming training from epoch: {self.last_epoch}")
-        else:
-            print("ModelSnapshot not found, training model from scratch!")
+    def _upload_snapshot(self, snapshot, dst):
+        """
+        We load the snapshot object into a buffer and then
+        upload to the s3 bucket
+        """
+        buffer = io.BytesIO()
+        # Save snapshot into in-memory buffer
+        torch.save(snapshot, buffer)
+        # Set position to byte 0
+        buffer.seek(0)
+        dst = urlparse(dst, allow_fragments=False)
+        boto3.client('s3').upload_fileobj(buffer, dst.netloc, dst.path.lstrip('/'))
+
+    def _load_snapshot(self):
+        """Load model snapshot from s3 bucket"""
+        try:
+        # load onto the cpu
+            with fsspec.open(self.config.snapshot_path) as f:
+                snapshot_data = torch.load(f, map_location="cpu")
+        except FileNotFoundError:
+            print("Model snapshot not found. You need to train your model from scratch.")
+            return
+        # Load into ModelSnapshot object
+        model_snapshot = ModelSnapshot(**snapshot_data)
+        # Set model states into model which is on GPU
+        self.model.load_state_dict(model_snapshot.model_state)
+        # Set optimizer states on GPU
+        self.optimizer.load_state_dict(model_snapshot.optimizer_state)
+        # Last epoch
+        self.last_epoch = model_snapshot.final_epoch
+        print(f"Resuming training from epoch: {self.last_epoch}")
 
     def _run_batch(self, inputs, labels, train: bool = True) -> float:
         """Run forward and backward pass then compute loss"""
         with torch.set_grad_enabled(train):
             # Foward pass to compute loss and activations
             logits, loss = self.model(inputs, labels)
+        # If we are in training mode, zero gradients before update
         if train:
             self.optimizer.zero_grad(set_to_none=True)
             # Backward pass to compute gradients
@@ -114,10 +140,10 @@ class GPTTrainer:
             loss = self._run_batch(inputs, labels, train)
             if idx % 100 == 0:
                 print(
-                    f"[GPU{self.local_rank}] Epoch {epoch+1},{'Training' if train else 'Test'} loss {loss}"
+                    f"[GPU{self.local_rank}] Epoch {epoch},{'Training' if train else 'Test'} loss {loss}"
                 )
 
-    def _snapshot_model(self, epoch: int) -> None:
+    def _save_snapshot(self, epoch: int) -> None:
         """Checkpoint the model state and optimizer state for a given
         epoch. """
         model = self.model.module if hasattr(self.model,
@@ -127,11 +153,16 @@ class GPTTrainer:
             optimizer_state=self.optimizer.state_dict(),
             final_epoch=epoch,
         )
-        # Save snapshot as dictionary (it pickles underneath)
-        model_snapshot_file = "model_snapshot.pt"
-        torch.save(asdict(model_snapshot), model_snapshot_file)
+        snapshot = asdict(model_snapshot)
+        # If path is s3, upload model to bucket
+        snapshot_path = self.config.snapshot_path
+        if snapshot_path.startswith("s3://"):
+            self.upload_snapshot(snapshot, snapshot_path)
+        else:
+            # Save snapshot to disk
+            torch.save(snapshot, snapshot_path)
         print(
-            f"Model snapshot taken and saved at epoch {epoch}, filename: {model_snapshot_file}"
+            f"Model snapshot taken and saved at epoch {epoch}"
         )
 
     def train(self, max_epochs: int) -> None:
@@ -143,7 +174,7 @@ class GPTTrainer:
             self._run_epoch(epoch, self.train_loader, True)
             # We only snapshot the model at the head node
             if self.local_rank == 0 and epoch % self.save_every == 0:
-                self._snapshot_model(epoch)
+                self._save_snapshot(epoch)
             # Evaluate on test set if test_loader is available, else its None
             if self.test_loader is not None:
                 # Set train to false so we run in evaluation mode and
