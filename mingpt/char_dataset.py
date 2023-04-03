@@ -20,7 +20,7 @@ class DataConfig:
 
 class CharDataset(Dataset):
 
-    def __init__(self, config: DataConfig, block_size: int):
+    def __init__(self, config: DataConfig):
         with fsspec.open(config.path) as f:
             data = f.read()
         data = data[:int(len(data)*config.truncate)]
@@ -29,7 +29,7 @@ class CharDataset(Dataset):
         print(f"Data has {len(data)} chars and {len(chars)} unique characters")
         self.stoi = {char: idx for idx, char in enumerate(chars)}
         self.itos = {idx: char for idx, char in enumerate(chars)}
-        self.block_size = block_size
+        self.block_size = config.block_size
         self.vocab_size = len(chars)
         self.data = data
 

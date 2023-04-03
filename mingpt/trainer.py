@@ -20,13 +20,13 @@ from torch.utils.data.distributed import DistributedSampler
 
 @dataclass
 class GPTTrainerConfig:
-    max_epochs: int = None
-    batch_size: int = None
-    learning_rate: float = None
-    grad_norm_clip: float = 0.1
-    dl_num_workers: int = 4
+    max_epochs: Optional[int] = None
+    batch_size: Optional[int] = None
+    learning_rate: Optional[float] = None
+    grad_norm_clip: Optional[float] = None
+    dl_num_workers: Optional[int] = None
     snapshot_path: Optional[str] = None
-    save_every: int = None
+    save_every: Optional[int] = None
 
 
 # Class to hold model state + optimizer state
