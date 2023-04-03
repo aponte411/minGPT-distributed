@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=gpt2-ddp multi-node training
+#SBATCH --job-name=gpt2-ddp-multi-node-training
 #SBATCH --nodes=2
 #SBATCH --ntasks=2
 #SBATCH --gpus-per-task=1
