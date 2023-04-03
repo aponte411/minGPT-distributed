@@ -42,6 +42,7 @@ class GPTTrainer:
     Trainer object to abstract away
     training details and interaction with s3.
     """
+
     def __init__(self,
                  config: GPTTrainerConfig,
                  model: torch.nn.Module,
@@ -90,16 +91,19 @@ class GPTTrainer:
         # Set position to byte 0
         buffer.seek(0)
         dst = urlparse(dst, allow_fragments=False)
-        boto3.client('s3').upload_fileobj(buffer, dst.netloc, dst.path.lstrip('/'))
+        boto3.client('s3').upload_fileobj(buffer, dst.netloc,
+                                          dst.path.lstrip('/'))
 
     def _load_snapshot(self):
         """Load model snapshot from s3 bucket"""
         try:
-        # load onto the cpu
+            # load onto the cpu
             with fsspec.open(self.config.snapshot_path) as f:
                 snapshot_data = torch.load(f, map_location="cpu")
         except FileNotFoundError:
-            print("Model snapshot not found. You need to train your model from scratch.")
+            print(
+                "Model snapshot not found. You need to train your model from scratch."
+            )
             return
         # Load into ModelSnapshot object
         model_snapshot = ModelSnapshot(**snapshot_data)
@@ -160,9 +164,7 @@ class GPTTrainer:
         else:
             # Save snapshot to disk
             torch.save(snapshot, snapshot_path)
-        print(
-            f"Model snapshot taken and saved at epoch {epoch}"
-        )
+        print(f"Model snapshot taken and saved at epoch {epoch}")
 
     def train(self) -> None:
         """Train model for max_epochs. We also snapshot

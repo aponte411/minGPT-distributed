@@ -4,10 +4,10 @@ from typing import Optional
 import fsspec
 import torch
 from torch.utils.data import Dataset
-
 """
 Adapted from https://github.com/karpathy/minGPT/blob/master/projects/chargpt/chargpt.py
 """
+
 
 @dataclass
 class DataConfig:
@@ -17,13 +17,12 @@ class DataConfig:
     truncate: float = 1.0
 
 
-
 class CharDataset(Dataset):
 
     def __init__(self, config: DataConfig):
         with fsspec.open(config.path) as f:
             data = f.read()
-        data = data[:int(len(data)*config.truncate)]
+        data = data[:int(len(data) * config.truncate)]
 
         chars = sorted(list(set(data)))
         print(f"Data has {len(data)} chars and {len(chars)} unique characters")
