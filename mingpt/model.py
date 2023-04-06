@@ -144,7 +144,7 @@ class MultiHeadSelfAttention(nn.Module):
             torch.tril(torch.ones(config.block_size, config.block_size)).view(
                 1, 1, config.block_size, config.block_size))
         # Use torch implementation
-        self.attn = torch.nn.MultiHeadAttention(
+        self.attn = torch.nn.MultiheadAttention(
             embed_dim=config.n_embed,
             num_heads=config.n_head,
             dropout=config.attn_drop,
@@ -207,9 +207,10 @@ class GPTEmbedding(nn.Module):
         )
         # Postional embeddings map indices to learned positional vectors
         self.pos_embedding = nn.Parameter(
-            torch.zeros(1, config.block_size, config.n_embed),
+            torch.zeros(1, config.block_size, config.n_embed,
             device=device,
             dtype=dtype,
+            )
         )
         self.drop = nn.Dropout(config.embed_drop)
         # Sequence length must be <= block size
@@ -236,7 +237,7 @@ class GPT(nn.Module):
     def __init__(self, config: GPTConfig):
         super().__init__()
         # Check configuration and populate with defaults from huggingface, openai, etc.
-        config = self.set_model_config(config)
+        config = self._set_model_config(config)
         self.block_size = config.block_size
         # Embeddings
         self.embedding = GPTEmbedding(config)

@@ -127,7 +127,7 @@ class GPTTrainer:
             loss.backward()
             # Clip gradients
             torch.nn.utils.clip_grad_norm(self.model.parameters(),
-                                          self.config.grap_norm_clip)
+                                          self.config.grad_norm_clip)
             # Update parameters
             self.optimizer.step()
         return loss.item()
