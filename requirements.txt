@@ -1,3 +1,4 @@
 torch
-torchvision
+fsspec
+boto3
 hydra-core
