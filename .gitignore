@@ -6,3 +6,4 @@ __pycache__/
 minGPT_distributed.egg-info/*
 mingpt/slurm/cluster-config-prod.yml
 *.pem
+.hydra/*
